@@ -50,7 +50,7 @@ _var_count = 0
 
 @dataclass
 class Scalar:
-    """A reimplementation of scalar values for autodifferentiation
+    """A re-implementation of scalar values for autodifferentiation
     tracking. Scalar Variables behave as close as possible to standard
     Python numbers while also tracking the operations that led to the
     number's creation. They can only be manipulated by
@@ -73,6 +73,40 @@ class Scalar:
     def __repr__(self) -> str:
         return f"Scalar({self.data})"
 
+    def __add__(self, b: ScalarLike) -> Scalar:
+        return Add.apply(self, b)
+
+    def __sub__(self, b: ScalarLike) -> Scalar:
+        return Add.apply(self, Neg.apply(b))
+
+    def __neg__(self) -> Scalar:
+        return Neg.apply(self)
+
+    def __lt__(self, b: ScalarLike) -> Scalar:
+        return LT.apply(self, b)
+
+    def __gt__(self, b: ScalarLike) -> Scalar:
+        return LT.apply(b, self)
+
+    def __eq__(self, b: ScalarLike) -> Scalar:
+        return EQ.apply(b, self)
+
+    def log(self) -> Scalar:
+        """Compute the natural logarithm."""
+        return Log.apply(self)
+
+    def exp(self) -> Scalar:
+        """Compute the exponential function."""
+        return Exp.apply(self)
+
+    def sigmoid(self) -> Scalar:
+        """Compute the sigmoid function."""
+        return Sigmoid.apply(self)
+
+    def relu(self) -> Scalar:
+        """Compute the ReLU function."""
+        return ReLU.apply(self)
+
     def __mul__(self, b: ScalarLike) -> Scalar:
         return Mul.apply(self, b)
 
@@ -90,8 +124,6 @@ class Scalar:
 
     def __rmul__(self, b: ScalarLike) -> Scalar:
         return self * b
-
-    # Variable elements for backprop
 
     def accumulate_derivative(self, x: Any) -> None:
         """Add `val` to the the derivative accumulated on this variable.
@@ -112,21 +144,32 @@ class Scalar:
         return self.history is not None and self.history.last_fn is None
 
     def is_constant(self) -> bool:
+        """True if this variable is a constant (no derivative)"""
         return self.history is None
 
     @property
     def parents(self) -> Iterable[Variable]:
-        """Get the variables used to create this one."""
+        """Returns the parents of this variable."""
         assert self.history is not None
         return self.history.inputs
 
     def chain_rule(self, d_output: Any) -> Iterable[Tuple[Variable, Any]]:
+        """Returns the derivatives of the parents of this variable."""
+        if self.is_constant() or self.is_leaf():
+            return []
         h = self.history
         assert h is not None
         assert h.last_fn is not None
         assert h.ctx is not None
 
-        raise NotImplementedError("Need to include this file from past assignment.")
+        # Compute the local gradients for each input using the last function's backward method.
+        local_derivatives = h.last_fn._backward(h.ctx, d_output)
+
+        # Multiply the local gradients with the output derivative (d_output) and pair with inputs
+        return [
+            (input_var, local_deriv)
+            for input_var, local_deriv in zip(h.inputs, local_derivatives)
+        ]
 
     def backward(self, d_output: Optional[float] = None) -> None:
         """Calls autodiff to fill in the derivatives for the history of this object.
@@ -141,19 +184,9 @@ class Scalar:
             d_output = 1.0
         backpropagate(self, d_output)
 
-    raise NotImplementedError("Need to include this file from past assignment.")
-
 
 def derivative_check(f: Any, *scalars: Scalar) -> None:
-    """Checks that autodiff works on a python function.
-    Asserts False if derivative is incorrect.
-
-    Parameters
-    ----------
-        f : function from n-scalars to 1-scalar.
-        *scalars  : n input scalar values.
-
-    """
+    """Check the derivatives of a function using autodifferentiation and central difference."""
     out = f(*scalars)
     out.backward()
 
