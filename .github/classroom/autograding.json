@@ -13,7 +13,7 @@
     {
       "name": "Task 3.1",
       "setup": "sudo -H pip3 install -qr requirements.txt",
-      "run": "pytest -m task3_1",
+      "run": "NUMBA_DISABLE_JIT=1 pytest -m task3_1",
       "input": "",
       "output": "",
       "comparison": "included",
@@ -23,7 +23,7 @@
     {
       "name": "Task 3.2",
       "setup": "sudo -H pip3 install -qr requirements.txt",
-      "run": "pytest -m task3_2",
+      "run": "NUMBA_DISABLE_JIT=1 pytest -m task3_2",
       "input": "",
       "output": "",
       "comparison": "included",
@@ -33,7 +33,7 @@
     {
       "name": "Task 3.3",
       "setup": "sudo -H pip3 install -qr requirements.txt",
-      "run": "pytest -m task3_3",
+      "run": "NUMBA_DISABLE_JIT=1 pytest -m task3_3",
       "input": "",
       "output": "",
       "comparison": "included",
@@ -43,7 +43,7 @@
     {
       "name": "Task 3.4",
       "setup": "sudo -H pip3 install -qr requirements.txt",
-      "run": "pytest -m task3_4",
+      "run": "NUMBA_DISABLE_JIT=1 pytest -m task3_4",
       "input": "",
       "output": "",
       "comparison": "included",
