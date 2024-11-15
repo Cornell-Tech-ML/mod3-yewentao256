@@ -1,8 +1,3 @@
-"""
-Be sure you have minitorch installed in you Virtual Env.
->>> pip install -Ue .
-"""
-
 import minitorch
 
 # Use this function to make a random parameter in your module.

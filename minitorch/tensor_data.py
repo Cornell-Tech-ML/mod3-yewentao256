@@ -46,16 +46,11 @@ def index_to_position(index: Index, strides: Strides) -> int:
         Position in storage
 
     """
-    if len(index) != len(strides):
-        raise IndexingError(
-            f"Index length {len(index)} does not match strides length {len(strides)}."
-        )
-
     # Compute the dot product of index and strides
     position = 0
     for idx, stride in zip(index, strides):
         position += idx * stride
-    return int(position)
+    return position
 
 
 def to_index(ordinal: int, shape: Shape, out_index: OutIndex) -> None:
@@ -71,12 +66,10 @@ def to_index(ordinal: int, shape: Shape, out_index: OutIndex) -> None:
         out_index : return index corresponding to position.
 
     """
-    if ordinal < 0 or ordinal >= prod(shape):
-        raise IndexingError(f"Ordinal {ordinal} is out of bounds for shape {shape}.")
     # starting from the last dimension, compute the index
     # eg: shape = (3, 4), ordinal = 11, out_index = [2, 3]
-    remaining = ordinal
-    for i in reversed(range(len(shape))):
+    remaining = ordinal + 0   # + 0 to copy
+    for i in range(len(shape) - 1, -1, -1):
         out_index[i] = remaining % shape[i]
         remaining = remaining // shape[i]
 
@@ -102,20 +95,12 @@ def broadcast_index(
         None
 
     """
-    len_big = len(big_shape)
-    len_small = len(shape)
-    # Pad the smaller shape with ones on the left
-    padded_shape = np.concatenate((np.ones(len_big - len_small, dtype=np.int32), shape))
-
-    for i in range(len_big):
-        if padded_shape[i] == 1:
-            # Dimension is broadcasted; index is 0
-            out_idx = 0
+    for i, s in enumerate(shape):
+        if s > 1:
+            out_index[i] = big_index[i + (len(big_shape) - len(shape))]
         else:
-            out_idx = big_index[i]
-        # Only store indices that correspond to the smaller shape dimensions
-        if i >= len_big - len_small:
-            out_index[i - (len_big - len_small)] = out_idx
+            out_index[i] = 0
+    return None
 
 
 def shape_broadcast(shape1: UserShape, shape2: UserShape) -> UserShape:
@@ -294,7 +279,7 @@ class TensorData:
 
         # Rearrange the shape and strides according to the permutation order
         new_shape = tuple(self.shape[i] for i in order)
-        new_strides = tuple(self.strides[i] for i in order)
+        new_strides = tuple(self._strides[i] for i in order)
 
         return TensorData(self._storage, new_shape, new_strides)
 

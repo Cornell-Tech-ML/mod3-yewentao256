@@ -31,12 +31,12 @@ def neg(a: float) -> float:
 
 def lt(a: float, b: float) -> float:
     """Check if a is less than b."""
-    return float(a < b)
+    return 1.0 if a < b else 0.0
 
 
 def eq(a: float, b: float) -> float:
     """Check if a is equal to b."""
-    return float(a == b)
+    return 1.0 if a == b else 0.0
 
 
 def max(a: float, b: float) -> float:
@@ -46,7 +46,7 @@ def max(a: float, b: float) -> float:
 
 def is_close(a: float, b: float) -> bool:
     """Check if two numbers are close."""
-    return abs(a - b) < 1e-2
+    return (a - b < 1e-2) and (b - a < 1e-2)
 
 
 def sigmoid(a: float) -> float:
@@ -62,12 +62,13 @@ def sigmoid(a: float) -> float:
 
 def relu(a: float) -> float:
     """Compute the ReLU function."""
-    return max(0.0, a)
+    return a if a > 0 else 0.0
 
+EPS = 1e-6
 
 def log(a: float) -> float:
     """Compute the natural logarithm."""
-    return math.log(a)
+    return math.log(a + EPS)
 
 
 def exp(a: float) -> float:
@@ -78,7 +79,7 @@ def exp(a: float) -> float:
 def log_back(a: float, d: float) -> float:
     """Compute the derivative of the logarithm function."""
     # d/dx log(x) = 1/x
-    return d / a
+    return d / (a + EPS)
 
 
 def inv(a: float) -> float:
@@ -89,13 +90,13 @@ def inv(a: float) -> float:
 def inv_back(a: float, d: float) -> float:
     """Compute the derivative of the inverse function."""
     # d/dx 1/x = -1/x^2
-    return -d / (a * a)
+    return -d / (a **2)
 
 
 def relu_back(a: float, d: float) -> float:
     """Compute the derivative of the ReLU function."""
     # d/dx relu(x) = 1 if x > 0 else 0
-    return d * (a > 0)
+    return d if a > 0 else 0.0
 
 
 def map(f: Callable[[float], float], iter: Iterable[float]) -> List[float]:

@@ -1,8 +1,7 @@
 import random
-
 import numba
-
 import minitorch
+import time  # Import time module
 
 datasets = minitorch.datasets
 FastTensorBackend = minitorch.TensorBackend(minitorch.FastOps)
@@ -10,8 +9,8 @@ if numba.cuda.is_available():
     GPUBackend = minitorch.TensorBackend(minitorch.CudaOps)
 
 
-def default_log_fn(epoch, total_loss, correct, losses):
-    print("Epoch ", epoch, " loss ", total_loss, "correct", correct)
+def default_log_fn(epoch, total_loss, correct, losses, epoch_time):  # Updated signature
+    print(f"Epoch {epoch} | Loss: {total_loss:.4f} | Correct: {correct} | Time: {epoch_time:.2f} sec")
 
 
 def RParam(*shape, backend):
@@ -20,7 +19,7 @@ def RParam(*shape, backend):
 
 
 class Network(minitorch.Module):
-    def __init__(self, hidden, backend):
+    def __init__(self, hidden: int, backend: minitorch.TensorBackend) -> None:
         super().__init__()
 
         # Submodules
@@ -28,13 +27,15 @@ class Network(minitorch.Module):
         self.layer2 = Linear(hidden, hidden, backend)
         self.layer3 = Linear(hidden, 1, backend)
 
-    def forward(self, x):
-        # TODO: Implement for Task 3.5.
-        raise NotImplementedError("Need to implement for Task 3.5")
+    def forward(self, x: minitorch.Tensor) -> minitorch.Tensor:
+        middle = self.layer1.forward(x).relu()
+        end = self.layer2.forward(middle).relu()
+        output = self.layer3.forward(end).sigmoid()
+        return output
 
 
 class Linear(minitorch.Module):
-    def __init__(self, in_size, out_size, backend):
+    def __init__(self, in_size: int, out_size: int, backend: minitorch.TensorBackend) -> int:
         super().__init__()
         self.weights = RParam(in_size, out_size, backend=backend)
         s = minitorch.zeros((out_size,), backend=backend)
@@ -42,9 +43,8 @@ class Linear(minitorch.Module):
         self.bias = minitorch.Parameter(s)
         self.out_size = out_size
 
-    def forward(self, x):
-        # TODO: Implement for Task 3.5.
-        raise NotImplementedError("Need to implement for Task 3.5")
+    def forward(self, x: minitorch.Tensor) -> minitorch.Tensor:
+        return x @ self.weights.value + self.bias.value
 
 
 class FastTrain:
@@ -65,7 +65,8 @@ class FastTrain:
         BATCH = 10
         losses = []
 
-        for epoch in range(max_epochs):
+        for epoch in range(1, max_epochs + 1):
+            start_time = time.time()
             total_loss = 0.0
             c = list(zip(data.X, data.y))
             random.shuffle(c)
@@ -82,12 +83,12 @@ class FastTrain:
                 loss = -prob.log()
                 (loss / y.shape[0]).sum().view(1).backward()
 
-                total_loss = loss.sum().view(1)[0]
-
-                # Update
+                total_loss += loss.sum().view(1)[0].item()
                 optim.step()
 
             losses.append(total_loss)
+            epoch_time = time.time() - start_time
+
             # Logging
             if epoch % 10 == 0 or epoch == max_epochs:
                 X = minitorch.tensor(data.X, backend=self.backend)
@@ -95,7 +96,7 @@ class FastTrain:
                 out = self.model.forward(X).view(y.shape[0])
                 y2 = minitorch.tensor(data.y)
                 correct = int(((out.detach() > 0.5) == y2).sum()[0])
-                log_fn(epoch, total_loss, correct, losses)
+                log_fn(epoch, total_loss, correct, losses, epoch_time)  # Pass epoch_time
 
 
 if __name__ == "__main__":
@@ -122,7 +123,7 @@ if __name__ == "__main__":
 
     HIDDEN = int(args.HIDDEN)
     RATE = args.RATE
-
+    SimpleBackend = minitorch.TensorBackend(minitorch.SimpleOps)
     FastTrain(
         HIDDEN, backend=FastTensorBackend if args.BACKEND != "gpu" else GPUBackend
     ).train(data, RATE)

@@ -104,11 +104,7 @@ class All(Function):
     @staticmethod
     def forward(ctx: Context, a: Tensor, dim: Tensor) -> Tensor:
         """Return 1 if all are true"""
-        # dim == -1 when no dim is specified
-        if dim != -1:
-            return a.f.mul_reduce(a, int(dim.item()))
-        else:
-            return a.f.mul_reduce(a.contiguous().view(int(operators.prod(a.shape))), 0)
+        return a.f.mul_reduce(a.contiguous().view(int(operators.prod(a.shape))), 0)
 
 
 class Mul(Function):
@@ -139,11 +135,7 @@ class Sigmoid(Function):
     def backward(ctx: Context, grad_output: Tensor) -> Tensor:
         """Backward pass for Sigmoid."""
         (output,) = ctx.saved_values  # output = sigmoid(t1)
-        one_tensor = ones(output.shape, backend=output.backend)
-        one_minus_output = one_tensor.f.add_zip(one_tensor, output.f.neg_map(output))
-        sigmoid_derivative = output.f.mul_zip(output, one_minus_output)
-        grad_input = grad_output.f.mul_zip(grad_output, sigmoid_derivative)
-        return grad_input
+        return output * (-output + 1.0) * grad_output
 
 
 class ReLU(Function):
@@ -191,26 +183,17 @@ class Exp(Function):
 
 class Sum(Function):
     @staticmethod
-    def forward(ctx: Context, t1: Tensor, dim: Optional[Tensor] = None) -> Tensor:
+    def forward(ctx: Context, t1: Tensor, dim: Tensor) -> Tensor:
         """Sum over a dimension."""
         ctx.save_for_backward(t1.shape, dim)
-        dim_value = int(dim.item()) if dim else 0
-        return t1.f.add_reduce(t1, dim_value)
+        return t1.f.add_reduce(t1, int(dim.item()))
 
     @staticmethod
-    def backward(ctx: Context, grad_output: Tensor) -> Tensor:
+    def backward(ctx: Context, grad_output: Tensor) -> Tuple[Tensor, float]:
         """Calculate the gradient for sum."""
-        shape, dim = ctx.saved_values
-        one = ones(shape, backend=grad_output.backend)
-        if dim is None:
-            # Sum over all dimensions
-            grad_input = grad_output * one
-        else:
-            # Expand grad_output to match input shape
-            grad_input = one.expand(grad_output)
-        # Sum should have just one return gradients, but dim is considered as a tensor
-        # So we simply return a meaning less tensor `one` here
-        return grad_input, one  # type: ignore
+        # Note: The grad_output should be expanded
+        # The code is in `tensor.py: chain_rule` (inp, inp.expand(self._ensure_tensor(d_in)))
+        return grad_output, 0.0
 
 
 class LT(Function):
@@ -224,9 +207,7 @@ class LT(Function):
     def backward(ctx: Context, grad_output: Tensor) -> Tuple[Tensor, Tensor]:
         """No gradients for comparison operations."""
         shape1, shape2 = ctx.saved_values
-        grad_a = zeros(shape1, backend=grad_output.backend)
-        grad_b = zeros(shape2, backend=grad_output.backend)
-        return grad_a, grad_b
+        return zeros(shape1), zeros(shape2)
 
 
 class EQ(Function):
@@ -240,9 +221,7 @@ class EQ(Function):
     def backward(ctx: Context, grad_output: Tensor) -> Tuple[Tensor, Tensor]:
         """No gradients for comparison operations."""
         shape1, shape2 = ctx.saved_values
-        grad_a = zeros(shape1, backend=grad_output.backend)
-        grad_b = zeros(shape2, backend=grad_output.backend)
-        return grad_a, grad_b
+        return zeros(shape1), zeros(shape2)
 
 
 class IsClose(Function):
@@ -261,7 +240,7 @@ class Permute(Function):
         return t1._new(t1._tensor.permute(*order_list))
 
     @staticmethod
-    def backward(ctx: Context, grad_output: Tensor) -> Tensor:
+    def backward(ctx: Context, grad_output: Tensor) -> Tuple[Tensor, float]:
         """Calculate the gradient for permute."""
         order_list = ctx.saved_values[0]
         # Invert the permutation
@@ -271,9 +250,7 @@ class Permute(Function):
         for i, o in enumerate(order_list):
             inverse_order[o] = i
         # Same as sum, returning a useless tensor grad for `order`
-        return grad_output._new(grad_output._tensor.permute(*inverse_order)), ones(
-            (len(order_list),)
-        )  # type: ignore
+        return grad_output._new(grad_output._tensor.permute(*inverse_order)), 0.0
 
 
 class View(Function):

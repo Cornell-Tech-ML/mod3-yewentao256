@@ -30,6 +30,7 @@ from .tensor_functions import (
     Sigmoid,
     Sum,
     View,
+    tensor,
 )
 
 if TYPE_CHECKING:
@@ -290,47 +291,39 @@ class Tensor:
     @property
     def size(self) -> int:
         """Total number of elements in the tensor."""
-        return int(operators.prod(self.shape))
+        return self._tensor.size
 
     @property
     def dims(self) -> int:
         """Number of dimensions of the tensor."""
-        return len(self.shape)
+        return self._tensor.dims
 
     def __add__(self, other: TensorLike) -> Tensor:
-        other_tensor = self._ensure_tensor(other)
-        return Add.apply(self, other_tensor)
+        return Add.apply(self, self._ensure_tensor(other))
 
     def __radd__(self, other: TensorLike) -> Tensor:
-        other_tensor = self._ensure_tensor(other)
-        return Add.apply(other_tensor, self)
+        return self + other
 
     def __sub__(self, other: TensorLike) -> Tensor:
-        other_tensor = self._ensure_tensor(other)
-        return Add.apply(self, Neg.apply(other_tensor))
+        return Add.apply(self, -self._ensure_tensor(other))
 
     def __mul__(self, other: TensorLike) -> Tensor:
-        other_tensor = self._ensure_tensor(other)
-        return Mul.apply(self, other_tensor)
+        return Mul.apply(self, self._ensure_tensor(other))
 
     def __rmul__(self, other: TensorLike) -> Tensor:
-        other_tensor = self._ensure_tensor(other)
-        return Mul.apply(other_tensor, self)
+        return self * other
 
     def __neg__(self) -> Tensor:
         return Neg.apply(self)
 
     def __lt__(self, other: TensorLike) -> Tensor:
-        other_tensor = self._ensure_tensor(other)
-        return LT.apply(self, other_tensor)
+        return LT.apply(self, self._ensure_tensor(other))
 
     def __eq__(self, other: TensorLike) -> Tensor:
-        other_tensor = self._ensure_tensor(other)
-        return EQ.apply(self, other_tensor)
+        return EQ.apply(self, self._ensure_tensor(other))
 
     def __gt__(self, other: TensorLike) -> Tensor:
-        other_tensor = self._ensure_tensor(other)
-        return LT.apply(other_tensor, self)
+        return LT.apply(self._ensure_tensor(other), self)
 
     def sigmoid(self) -> Tensor:
         """Sigmoid activation function."""
@@ -350,40 +343,29 @@ class Tensor:
 
     def sum(self, dim: Optional[int] = None) -> Tensor:
         """Sum over a dimension."""
-        if dim is not None:
-            dim_tensor = Tensor.make([dim], (1,), backend=self.backend)
-            return Sum.apply(self, dim_tensor)
+        if dim is None:
+            return Sum.apply(self.contiguous().view(self.size), self._ensure_tensor(0))
         else:
-            # Sum over all dimensions
-            flattened = self.contiguous().view(int(operators.prod(self.shape)))
-            dim_tensor = Tensor.make([0], (1,), backend=self.backend)
-            return Sum.apply(flattened, dim_tensor)
+            return Sum.apply(self, self._ensure_tensor(dim))
 
     def mean(self, dim: Optional[int] = None) -> Tensor:
         """Mean over a dimension."""
-        total = self.sum(dim=dim)
-        if dim is None:
-            num_elements = self.size
+        if dim is not None:
+            return self.sum(dim) / self.shape[dim]
         else:
-            num_elements = self.shape[dim]
-        return total / num_elements
+            return self.sum() / self.size
 
     def is_close(self, other: TensorLike) -> Tensor:
         """Check if two tensors are close."""
-        other_tensor = self._ensure_tensor(other)
-        return IsClose.apply(self, other_tensor)
+        return IsClose.apply(self, self._ensure_tensor(other))
 
     def permute(self, *order: int) -> Tensor:
         """Permute the dimensions of this tensor."""
-        order_tensor = Tensor(TensorData(order, (len(order),)), backend=self.backend)
-        return Permute.apply(self, order_tensor)
+        return Permute.apply(self, tensor(list(order)))
 
     def view(self, *shape: int) -> Tensor:
         """Reshape the tensor."""
-        shape_tensor = Tensor(
-            TensorData(list(shape), (len(shape),)), backend=self.backend
-        )
-        return View.apply(self, shape_tensor)
+        return View.apply(self, tensor(list(shape)))
 
     def zero_grad_(self) -> None:
         """Set the gradient of the tensor to None."""
@@ -391,9 +373,7 @@ class Tensor:
 
     def all(self, dim: Optional[int] = None) -> Tensor:
         """Check if all elements are true."""
-        dim_tensor = (
-            Tensor.make([dim], (1,), backend=self.backend)
-            if dim is not None
-            else Tensor.make([-1], (1,), backend=self.backend)
-        )
-        return All.apply(self, dim_tensor)
+        if dim is None:
+            return All.apply(self.view(self.size), self._ensure_tensor(0))
+        else:
+            return All.apply(self, self._ensure_tensor(dim))
