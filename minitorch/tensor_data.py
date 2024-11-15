@@ -68,7 +68,7 @@ def to_index(ordinal: int, shape: Shape, out_index: OutIndex) -> None:
     """
     # starting from the last dimension, compute the index
     # eg: shape = (3, 4), ordinal = 11, out_index = [2, 3]
-    remaining = ordinal + 0   # + 0 to copy
+    remaining = ordinal + 0  # + 0 to copy
     for i in range(len(shape) - 1, -1, -1):
         out_index[i] = remaining % shape[i]
         remaining = remaining // shape[i]

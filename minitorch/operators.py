@@ -64,7 +64,9 @@ def relu(a: float) -> float:
     """Compute the ReLU function."""
     return a if a > 0 else 0.0
 
+
 EPS = 1e-6
+
 
 def log(a: float) -> float:
     """Compute the natural logarithm."""
@@ -90,7 +92,7 @@ def inv(a: float) -> float:
 def inv_back(a: float, d: float) -> float:
     """Compute the derivative of the inverse function."""
     # d/dx 1/x = -1/x^2
-    return -d / (a **2)
+    return -d / (a**2)
 
 
 def relu_back(a: float, d: float) -> float:

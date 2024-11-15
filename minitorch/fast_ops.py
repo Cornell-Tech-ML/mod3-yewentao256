@@ -7,7 +7,6 @@ from numba import prange
 from numba import njit as _njit
 
 from .tensor_data import (
-    MAX_DIMS,
     broadcast_index,
     index_to_position,
     shape_broadcast,
@@ -19,7 +18,7 @@ if TYPE_CHECKING:
     from typing import Callable, Optional
 
     from .tensor import Tensor
-    from .tensor_data import Index, Shape, Storage, Strides
+    from .tensor_data import Shape, Storage, Strides
 
 # TIP: Use `NUMBA_DISABLE_JIT=1 pytest tests/ -m task3_1` to run these tests without JIT.
 
@@ -30,6 +29,7 @@ Fn = TypeVar("Fn")
 
 
 def njit(fn: Fn, **kwargs: Any) -> Fn:
+    """Decorator for JIT compiling functions with NUMBA."""
     return _njit(inline="always", **kwargs)(fn)  # type: ignore
 
 
@@ -169,7 +169,9 @@ def tensor_map(
         in_strides: Strides,
     ) -> None:
         out_size = len(out)
-        if np.array_equal(out_strides, in_strides) and np.array_equal(out_shape, in_shape):
+        if np.array_equal(out_strides, in_strides) and np.array_equal(
+            out_shape, in_shape
+        ):
             # Stride-aligned case: apply function directly to corresponding elements.
             for i in prange(out_size):
                 out[i] = fn(in_storage[i])
@@ -223,12 +225,16 @@ def tensor_zip(
     ) -> None:
         out_size = len(out)
         aligned = True
-        if (len(out_shape) != len(a_shape) or len(out_shape) != len(b_shape)):
+        if len(out_shape) != len(a_shape) or len(out_shape) != len(b_shape):
             aligned = False
         else:
             for i in range(len(out_shape)):
-                if (out_shape[i] != a_shape[i] or out_shape[i] != b_shape[i] or
-                    out_strides[i] != a_strides[i] or out_strides[i] != b_strides[i]):
+                if (
+                    out_shape[i] != a_shape[i]
+                    or out_shape[i] != b_shape[i]
+                    or out_strides[i] != a_strides[i]
+                    or out_strides[i] != b_strides[i]
+                ):
                     aligned = False
                     break
         if aligned:
@@ -379,6 +385,7 @@ def _tensor_matrix_multiply(
                     total += a_storage[a_index] * b_storage[b_index]
 
                 out[out_index] = total
+
 
 tensor_matrix_multiply = njit(_tensor_matrix_multiply, parallel=True)
 assert tensor_matrix_multiply is not None

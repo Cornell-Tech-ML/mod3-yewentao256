@@ -477,8 +477,8 @@ def _tensor_matrix_multiply(
     Returns:
         None : Fills in `out`
     """
-    a_batch_stride = a_strides[0] if a_shape[0] > 1 else 0
-    b_batch_stride = b_strides[0] if b_shape[0] > 1 else 0
+    # a_batch_stride = a_strides[0] if a_shape[0] > 1 else 0
+    # b_batch_stride = b_strides[0] if b_shape[0] > 1 else 0
     # Batch dimension - fixed
     batch = cuda.blockIdx.z
 
@@ -511,14 +511,22 @@ def _tensor_matrix_multiply(
     for m in range((K + BLOCK_DIM - 1) // BLOCK_DIM):
         # Load data into shared memory
         if row < M and (m * BLOCK_DIM + ty) < K:
-            a_idx = [batch, row, m * BLOCK_DIM + ty] if len(a_shape) == 3 else [row, m * BLOCK_DIM + ty]
+            a_idx = (
+                [batch, row, m * BLOCK_DIM + ty]
+                if len(a_shape) == 3
+                else [row, m * BLOCK_DIM + ty]
+            )
             a_pos = index_to_position(a_idx, a_strides)
             a_shared[tx, ty] = a_storage[a_pos]
         else:
             a_shared[tx, ty] = 0.0
 
         if col < N and (m * BLOCK_DIM + tx) < K:
-            b_idx = [batch, m * BLOCK_DIM + tx, col] if len(b_shape) == 3 else [m * BLOCK_DIM + tx, col]
+            b_idx = (
+                [batch, m * BLOCK_DIM + tx, col]
+                if len(b_shape) == 3
+                else [m * BLOCK_DIM + tx, col]
+            )
             b_pos = index_to_position(b_idx, b_strides)
             b_shared[tx, ty] = b_storage[b_pos]
         else:
@@ -536,7 +544,6 @@ def _tensor_matrix_multiply(
         out_idx = [batch, row, col] if len(out_shape) == 3 else [row, col]
         out_pos = index_to_position(out_idx, out_strides)
         out[out_pos] = tmp
-
 
 
 tensor_matrix_multiply = jit(_tensor_matrix_multiply)
