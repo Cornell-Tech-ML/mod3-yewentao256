@@ -38,10 +38,7 @@ class Linear(minitorch.Module):
     def __init__(self, in_size: int, out_size: int, backend: minitorch.TensorBackend) -> int:
         super().__init__()
         self.weights = RParam(in_size, out_size, backend=backend)
-        s = minitorch.zeros((out_size,), backend=backend)
-        s = s + 0.1
-        self.bias = minitorch.Parameter(s)
-        self.out_size = out_size
+        self.bias = RParam(out_size, backend=backend)
 
     def forward(self, x: minitorch.Tensor) -> minitorch.Tensor:
         return x @ self.weights.value + self.bias.value
@@ -64,6 +61,8 @@ class FastTrain:
         optim = minitorch.SGD(self.model.parameters(), learning_rate)
         BATCH = 10
         losses = []
+        epoch_times = []  # List to store the last 10 epoch times
+        consecutive_correct = 0  # Counter for consecutive correct predictions
 
         for epoch in range(1, max_epochs + 1):
             start_time = time.time()
@@ -89,14 +88,33 @@ class FastTrain:
             losses.append(total_loss)
             epoch_time = time.time() - start_time
 
+            # Update epoch_times list
+            epoch_times.append(epoch_time)
+            if len(epoch_times) > 10:
+                epoch_times.pop(0)
+
+            # Calculate average epoch time over the last 10 epochs
+            avg_epoch_time = sum(epoch_times) / len(epoch_times)
+
             # Logging
             if epoch % 10 == 0 or epoch == max_epochs:
                 X = minitorch.tensor(data.X, backend=self.backend)
                 y = minitorch.tensor(data.y, backend=self.backend)
                 out = self.model.forward(X).view(y.shape[0])
-                y2 = minitorch.tensor(data.y)
+                y2 = minitorch.tensor(data.y, backend=self.backend)
                 correct = int(((out.detach() > 0.5) == y2).sum()[0])
-                log_fn(epoch, total_loss, correct, losses, epoch_time)  # Pass epoch_time
+
+                # Check for early stopping
+                if correct == 50:
+                    consecutive_correct += 1
+                else:
+                    consecutive_correct = 0
+
+                log_fn(epoch, total_loss, correct, losses, avg_epoch_time)  # Pass avg_epoch_time
+
+                if consecutive_correct >= 2:
+                    print(f"Early stopping at epoch {epoch} as correct predictions reached 50 in two consecutive epochs.")
+                    break
 
 
 if __name__ == "__main__":

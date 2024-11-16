@@ -349,43 +349,41 @@ def _tensor_matrix_multiply(
         None : Fills in `out`
 
     """
-    batch_size = out_shape[0]
-    m = out_shape[1]
-    n = out_shape[2]
-    k_size = a_shape[2]  # Must be equal to b_shape[1]
+    B, M, N = out_shape
+    K = a_shape[2]  # Must be equal to b_shape[1]
+    assert a_shape[-1] == b_shape[-2]
 
-    batch_stride_out = out_strides[0]
-    i_stride_out = out_strides[1]
-    j_stride_out = out_strides[2]
+    b_stride_out, m_stride_out, n_stride_out = out_strides
 
-    batch_stride_a = a_strides[0] if a_shape[0] != 1 else 0
-    i_stride_a = a_strides[1] if a_shape[1] != 1 else 0
+    b_stride_a = a_strides[0] if a_shape[0] != 1 else 0
+    m_stride_a = a_strides[1] if a_shape[1] != 1 else 0
     k_stride_a = a_strides[2] if a_shape[2] != 1 else 0
 
-    batch_stride_b = b_strides[0] if b_shape[0] != 1 else 0
+    b_stride_b = b_strides[0] if b_shape[0] != 1 else 0
     k_stride_b = b_strides[1] if b_shape[1] != 1 else 0
-    j_stride_b = b_strides[2] if b_shape[2] != 1 else 0
+    n_stride_b = b_strides[2] if b_shape[2] != 1 else 0
+    
+    for b in prange(B):
+        b_a = b * b_stride_a
+        b_b = b * b_stride_b
+        b_out = b * b_stride_out
 
-    for batch in prange(batch_size):
-        batch_a = batch * batch_stride_a
-        batch_b = batch * batch_stride_b
-        batch_out = batch * batch_stride_out
-
-        for i in range(m):
-            a_i = batch_a + i * i_stride_a
-            out_i = batch_out + i * i_stride_out
-
-            for j in range(n):
-                out_index = out_i + j * j_stride_out
+        for m in range(M):
+            a_m = b_a + m * m_stride_a
+            out_index = b_out + m * m_stride_out
+            for n in range(N):
                 total = 0.0
 
-                for k in range(k_size):
-                    a_index = a_i + k * k_stride_a
-                    b_index = batch_b + k * k_stride_b + j * j_stride_b
+                a_index = a_m
+                b_index = b_b + n * n_stride_b
+                for _ in range(K):
                     total += a_storage[a_index] * b_storage[b_index]
+                    a_index += k_stride_a
+                    b_index += k_stride_b
 
                 out[out_index] = total
+                out_index += n_stride_out
 
 
-tensor_matrix_multiply = njit(_tensor_matrix_multiply, parallel=True)
+tensor_matrix_multiply = njit(_tensor_matrix_multiply, parallel=True, fastmath=True)
 assert tensor_matrix_multiply is not None
