@@ -177,9 +177,9 @@ def tensor_map(
                 out[i] = fn(in_storage[i])
         else:
             # Non-aligned case: use indexing
-            out_index = np.empty(len(out_shape), dtype=np.int32)
-            in_index = np.empty(len(in_shape), dtype=np.int32)
             for i in prange(out_size):
+                out_index = np.empty(len(out_shape), dtype=np.int32)
+                in_index = np.empty(len(in_shape), dtype=np.int32)
                 to_index(i, out_shape, out_index)
                 broadcast_index(out_index, out_shape, in_shape, in_index)
                 out_pos = index_to_position(out_index, out_strides)
@@ -242,10 +242,10 @@ def tensor_zip(
             for i in prange(out_size):
                 out[i] = fn(a_storage[i], b_storage[i])
         else:
-            out_index = np.empty(len(out_shape), dtype=np.int32)
-            a_index = np.empty(len(a_shape), dtype=np.int32)
-            b_index = np.empty(len(b_shape), dtype=np.int32)
             for i in prange(out_size):
+                out_index = np.empty(len(out_shape), dtype=np.int32)
+                a_index = np.empty(len(a_shape), dtype=np.int32)
+                b_index = np.empty(len(b_shape), dtype=np.int32)
                 to_index(i, out_shape, out_index)
                 broadcast_index(out_index, out_shape, a_shape, a_index)
                 broadcast_index(out_index, out_shape, b_shape, b_index)
@@ -287,8 +287,8 @@ def tensor_reduce(
         a_strides: Strides,
         reduce_dim: int,
     ) -> None:
-        out_index = np.empty(len(out_shape), dtype=np.int32)
         for i in prange(len(out)):
+            out_index = np.empty(len(out_shape), dtype=np.int32)
             to_index(i, out_shape, out_index)
             out_pos = index_to_position(out_index, out_strides)
             total = out[out_pos]
@@ -362,7 +362,7 @@ def _tensor_matrix_multiply(
     b_stride_b = b_strides[0] if b_shape[0] != 1 else 0
     k_stride_b = b_strides[1] if b_shape[1] != 1 else 0
     n_stride_b = b_strides[2] if b_shape[2] != 1 else 0
-    
+
     for b in prange(B):
         b_a = b * b_stride_a
         b_b = b * b_stride_b

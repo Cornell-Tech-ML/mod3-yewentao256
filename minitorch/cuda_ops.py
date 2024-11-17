@@ -98,7 +98,7 @@ class CudaOps(TensorOps):
             out_a = a.zeros(tuple(out_shape))
 
             # threadsperblock = 1024    # T4
-            threadsperblock = 512       # RTX 2070
+            threadsperblock = 512  # RTX 2070
             blockspergrid = out_a.size
             f[blockspergrid, threadsperblock](  # type: ignore
                 *out_a.tuple(), out_a.size, *a.tuple(), dim, start
@@ -474,11 +474,16 @@ def _tensor_matrix_multiply(
     """
     a_batch_stride = a_strides[0] if a_shape[0] > 1 else 0
     b_batch_stride = b_strides[0] if b_shape[0] > 1 else 0
+    a_m_strides = a_strides[-2]
+    a_k_strides = a_strides[-1]
+    b_k_strides = b_strides[-2]
+    b_n_strides = b_strides[-1]
+
     batch = cuda.blockIdx.z
 
-    BLOCK_DIM = 32 
-    a_shared = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float64)
-    b_shared = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float64)
+    BLOCK_DIM = 32
+    a_shared = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float32)
+    b_shared = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float32)
 
     i = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
     j = cuda.blockIdx.y * cuda.blockDim.y + cuda.threadIdx.y
@@ -489,65 +494,35 @@ def _tensor_matrix_multiply(
     N = out_shape[-1]
     K = a_shape[-1]
 
-    # Batch size handling for potential broadcasting
-    a_batch = batch if a_shape[0] > 1 else 0
-    b_batch = batch if b_shape[0] > 1 else 0
-
-    # Initialize the result for this thread's output element
     result = 0.0
 
     # Number of tiles to cover the K dimension
     tiles = (K + BLOCK_DIM - 1) // BLOCK_DIM
-
-    # Loop over tiles
+    a_i = i
+    a_j = ty
+    b_i = tx
+    b_j = j
     for t in range(tiles):
-        # Compute the global indices for elements to load
-        a_i = i  # Row index in `a`
-        a_j = t * BLOCK_DIM + ty  # Column index in `a`
-        b_i = t * BLOCK_DIM + tx  # Row index in `b`
-        b_j = j  # Column index in `b`
-
-        # Load elements from `a` into shared memory if within bounds
-        if a_i < a_shape[-2] and a_j < a_shape[-1]:
-            a_index = (
-                a_batch * a_batch_stride
-                + a_i * a_strides[-2]
-                + a_j * a_strides[-1]
-            )
+        if a_i < M and a_j < K:
+            a_index = batch * a_batch_stride + a_i * a_m_strides + a_j * a_k_strides
             a_shared[tx, ty] = a_storage[a_index]
-        else:
-            a_shared[tx, ty] = 0.0  # Pad with zeros if out of bounds
 
-        # Load elements from `b` into shared memory if within bounds
-        if b_i < b_shape[-2] and b_j < b_shape[-1]:
-            b_index = (
-                b_batch * b_batch_stride
-                + b_i * b_strides[-2]
-                + b_j * b_strides[-1]
-            )
-            b_shared[tx, ty] = b_storage[b_index]
-        else:
-            b_shared[tx, ty] = 0.0  # Pad with zeros if out of bounds
+        if b_i < K and b_j < N:
+            b_index = batch * b_batch_stride + b_i * b_k_strides + b_j * b_n_strides
+            b_shared[ty, tx] = b_storage[b_index]
 
-        # Synchronize to ensure all threads have loaded their data
         cuda.syncthreads()
 
         # Perform the multiplication for the current tile
         for k in range(BLOCK_DIM):
-            # Check if the index is within the valid K range
             if (t * BLOCK_DIM + k) < K:
-                result += a_shared[tx, k] * b_shared[k, ty]
+                result += a_shared[tx, k] * b_shared[ty, k]
 
-        # Synchronize before loading the next tile
-        cuda.syncthreads()
+        a_j += BLOCK_DIM
+        b_i += BLOCK_DIM
 
-    # Write the result to the output tensor if within bounds
     if i < M and j < N:
-        out_index = (
-            batch * out_strides[0]
-            + i * out_strides[1]
-            + j * out_strides[2]
-        )
+        out_index = batch * out_strides[0] + i * out_strides[1] + j * out_strides[2]
         out[out_index] = result
 
 
