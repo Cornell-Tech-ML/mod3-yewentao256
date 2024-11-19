@@ -47,7 +47,7 @@ class TensorOps:
     @staticmethod
     def matrix_multiply(a: Tensor, b: Tensor) -> Tensor:
         """Matrix multiply"""
-        raise NotImplementedError("Not implemented in this assignment")
+        ...
 
     cuda = False
 
@@ -228,7 +228,18 @@ class SimpleOps(TensorOps):
     @staticmethod
     def matrix_multiply(a: "Tensor", b: "Tensor") -> "Tensor":
         """Matrix multiplication"""
-        raise NotImplementedError("Not implemented in this assignment")
+        batch_size = a.shape[0]
+        in_size = a.shape[1]
+        out_size = b.shape[1]
+
+        a_expanded = a.contiguous().view(batch_size, in_size, 1)
+        b_expanded = b.contiguous().view(1, in_size, out_size)
+        # (batch_size, in_size, 1) * (1, in_size, out_size) -> (batch_size, in_size, out_size)
+        mul = a_expanded * b_expanded
+
+        # (batch_size, out_size)
+        output = mul.sum(dim=1).view(batch_size, out_size)
+        return output
 
     is_cuda = False
 

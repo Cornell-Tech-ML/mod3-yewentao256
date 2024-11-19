@@ -61,8 +61,7 @@ class FastTrain:
         optim = minitorch.SGD(self.model.parameters(), learning_rate)
         BATCH = 10
         losses = []
-        epoch_times = []  # List to store the last 10 epoch times
-        consecutive_correct = 0  # Counter for consecutive correct predictions
+        epoch_times = []
 
         for epoch in range(1, max_epochs + 1):
             start_time = time.time()
@@ -88,15 +87,13 @@ class FastTrain:
             losses.append(total_loss)
             epoch_time = time.time() - start_time
 
-            # Update epoch_times list
             epoch_times.append(epoch_time)
             if len(epoch_times) > 10:
                 epoch_times.pop(0)
 
-            # Calculate average epoch time over the last 10 epochs
+            # calculate average epoch time over the last 10 epochs
             avg_epoch_time = sum(epoch_times) / len(epoch_times)
 
-            # Logging
             if epoch % 10 == 0 or epoch == max_epochs:
                 X = minitorch.tensor(data.X, backend=self.backend)
                 y = minitorch.tensor(data.y, backend=self.backend)
@@ -104,17 +101,7 @@ class FastTrain:
                 y2 = minitorch.tensor(data.y, backend=self.backend)
                 correct = int(((out.detach() > 0.5) == y2).sum()[0])
 
-                # Check for early stopping
-                if correct == 50:
-                    consecutive_correct += 1
-                else:
-                    consecutive_correct = 0
-
-                log_fn(epoch, total_loss, correct, losses, avg_epoch_time)  # Pass avg_epoch_time
-
-                if consecutive_correct >= 2:
-                    print(f"Early stopping at epoch {epoch} as correct predictions reached 50 in two consecutive epochs.")
-                    break
+                log_fn(epoch, total_loss, correct, losses, avg_epoch_time)
 
 
 if __name__ == "__main__":
@@ -143,5 +130,5 @@ if __name__ == "__main__":
     RATE = args.RATE
     SimpleBackend = minitorch.TensorBackend(minitorch.SimpleOps)
     FastTrain(
-        HIDDEN, backend=FastTensorBackend if args.BACKEND != "gpu" else GPUBackend
+        HIDDEN, backend=SimpleBackend if args.BACKEND != "gpu" else GPUBackend
     ).train(data, RATE)

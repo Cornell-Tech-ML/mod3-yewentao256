@@ -300,15 +300,15 @@ class MatMul(Function):
         """Matrix Multiply backward (module 3)"""
         t1, t2 = ctx.saved_values
 
-        def transpose(a: Tensor) -> Tensor:
-            order = list(range(a.dims))
-            order[-2], order[-1] = order[-1], order[-2]
-            return a._new(a._tensor.permute(*order))
+        # transpose the last two dimensions
+        t2_transposed = t2.transpose()
+        t1_transposed = t1.transpose()
 
-        return (
-            grad_output.f.matrix_multiply(grad_output, transpose(t2)),
-            grad_output.f.matrix_multiply(transpose(t1), grad_output),
-        )
+        # grad_t1 = grad_output @ t2^T
+        # grad_t2 = t1^T @ grad_output
+        grad_t1 = grad_output.f.matrix_multiply(grad_output, t2_transposed)
+        grad_t2 = t1_transposed.f.matrix_multiply(t1_transposed, grad_output)
+        return grad_t1, grad_t2
 
 
 # Helpers for Constructing tensors

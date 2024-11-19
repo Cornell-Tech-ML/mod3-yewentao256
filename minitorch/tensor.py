@@ -193,6 +193,12 @@ class Tensor:
         assert out.size == self.size, f"{out.shape} {self.shape}"
         return Tensor.make(out._tensor._storage, self.shape, backend=self.backend)
 
+    def transpose(self) -> Tensor:
+        """Transpose the tensor."""
+        order = list(range(self.dims))
+        order[-2], order[-1] = order[-1], order[-2]
+        return self._new(self._tensor.permute(*order))
+
     def zeros(self, shape: Optional[UserShape] = None) -> Tensor:
         """Create a new tensor of zeros with the same shape as this tensor."""
 
@@ -276,7 +282,6 @@ class Tensor:
         return Mul.apply(self._ensure_tensor(b), Inv.apply(self))
 
     def __matmul__(self, b: Tensor) -> Tensor:
-        """Not used until Module 3"""
         return MatMul.apply(self, b)
 
     @property
