@@ -97,8 +97,8 @@ class CudaOps(TensorOps):
             out_shape[dim] = (a.shape[dim] - 1) // 1024 + 1
             out_a = a.zeros(tuple(out_shape))
 
-            # threadsperblock = 1024    # T4
-            threadsperblock = 512  # RTX 2070
+            threadsperblock = 1024    # T4
+            # threadsperblock = 512  # RTX 2070
             blockspergrid = out_a.size
             f[blockspergrid, threadsperblock](  # type: ignore
                 *out_a.tuple(), out_a.size, *a.tuple(), dim, start
@@ -329,8 +329,8 @@ def tensor_reduce(
         reduce_dim: int,
         reduce_value: float,
     ) -> None:
-        # BLOCK_DIM = 1024 # T4
-        BLOCK_DIM = 512  # My RTX 2070
+        BLOCK_DIM = 1024 # T4
+        # BLOCK_DIM = 512  # My RTX 2070
         cache = cuda.shared.array(BLOCK_DIM, numba.float64)
         out_index = cuda.local.array(MAX_DIMS, numba.int32)
         a_index = cuda.local.array(MAX_DIMS, numba.int32)
@@ -513,7 +513,7 @@ def _tensor_matrix_multiply(
 
         cuda.syncthreads()
 
-        # Perform the multiplication for the current tile
+        # multiplication for the current tile
         for k in range(BLOCK_DIM):
             if (t * BLOCK_DIM + k) < K:
                 result += a_shared[tx, k] * b_shared[ty, k]
