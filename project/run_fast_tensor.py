@@ -130,5 +130,5 @@ if __name__ == "__main__":
     RATE = args.RATE
     SimpleBackend = minitorch.TensorBackend(minitorch.SimpleOps)
     FastTrain(
-        HIDDEN, backend=SimpleBackend if args.BACKEND != "gpu" else GPUBackend
+        HIDDEN, backend=FastTensorBackend if args.BACKEND != "gpu" else GPUBackend
     ).train(data, RATE)
