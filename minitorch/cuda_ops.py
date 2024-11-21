@@ -129,10 +129,12 @@ class CudaOps(TensorOps):
 
         # One block per batch, extra rows, extra col
         blockspergrid = (
+            # (a + (y-1) // y) -> Round up 
             (out.shape[1] + (THREADS_PER_BLOCK - 1)) // THREADS_PER_BLOCK,
             (out.shape[2] + (THREADS_PER_BLOCK - 1)) // THREADS_PER_BLOCK,
             out.shape[0],
         )
+        # (32, 32, 1) means 32 columns, 32 rows, 1 batch
         threadsperblock = (THREADS_PER_BLOCK, THREADS_PER_BLOCK, 1)
 
         tensor_matrix_multiply[blockspergrid, threadsperblock](
@@ -347,6 +349,8 @@ def tensor_reduce(
         reduce_len = a_shape[reduce_dim]
 
         # Eg: s = 0, 512, 1024, 1536, ... to deal with case when reduce_len > block_dim
+        # Actually minitorch limit the reduce_len to be at most 1024, we don't need to
+        # care about this, but doesn't matter to have since it can cover all cases
         for s in range(pos, reduce_len, BLOCK_DIM):
             for d in range(len(out_shape)):
                 a_index[d] = out_index[d]
@@ -413,19 +417,19 @@ def _mm_practice(out: Storage, a: Storage, b: Storage, size: int) -> None:
     tx = cuda.threadIdx.x
     ty = cuda.threadIdx.y
 
-    # Load data into shared memory
+    # load data into shared memory
     if tx < size and ty < size:
-        a_shared[ty, tx] = a[ty * size + tx]
-        b_shared[ty, tx] = b[ty * size + tx]
+        a_shared[tx, ty] = a[tx * size + ty]
+        b_shared[tx, ty] = b[tx * size + ty]
 
     cuda.syncthreads()
 
-    # Compute the matrix multiplication
+    # compute the matrix multiplication
     if tx < size and ty < size:
         sum = 0.0
         for k in range(size):
-            sum += a_shared[ty, k] * b_shared[k, tx]
-        out[ty * size + tx] = sum
+            sum += a_shared[tx, k] * b_shared[k, ty]
+        out[tx * size + ty] = sum
 
 
 jit_mm_practice = jit(_mm_practice)
@@ -472,16 +476,21 @@ def _tensor_matrix_multiply(
     Returns:
         None : Fills in `out`
     """
+    # a_shape = (B, M, K), b_shape = (B, K, N), out_shape = (B, M, N)
+    # declare the variables to reduce index operations
     a_batch_stride = a_strides[0] if a_shape[0] > 1 else 0
     b_batch_stride = b_strides[0] if b_shape[0] > 1 else 0
-    a_m_strides = a_strides[-2]
-    a_k_strides = a_strides[-1]
-    b_k_strides = b_strides[-2]
-    b_n_strides = b_strides[-1]
-
+    M = a_shape[1]
+    K = a_shape[2]
+    assert K == b_shape[1]
+    N = b_shape[2]
+    a_m_strides = a_strides[1]
+    a_k_strides = a_strides[2]
+    b_k_strides = b_strides[1]
+    b_n_strides = b_strides[2]
     batch = cuda.blockIdx.z
-
     BLOCK_DIM = 32
+    
     a_shared = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float32)
     b_shared = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float32)
 
@@ -490,27 +499,28 @@ def _tensor_matrix_multiply(
     tx = cuda.threadIdx.x
     ty = cuda.threadIdx.y
 
-    M = out_shape[-2]
-    N = out_shape[-1]
-    K = a_shape[-1]
-
     result = 0.0
-
-    # Number of tiles to cover the K dimension
+    # number of tiles to cover the K dimension
     tiles = (K + BLOCK_DIM - 1) // BLOCK_DIM
-    a_i = i
-    a_j = ty
-    b_i = tx
-    b_j = j
+    a_m = i
+    a_k = ty
+    b_k = tx
+    b_n = j
+    # here we precompute the start to reduce the number of operations
+    a_start = batch * a_batch_stride + a_m * a_m_strides
+    b_start = batch * b_batch_stride + b_n * b_n_strides
     for t in range(tiles):
-        if a_i < M and a_j < K:
-            a_index = batch * a_batch_stride + a_i * a_m_strides + a_j * a_k_strides
+        # guard: check if the current tile is within the bounds of the matrix
+        if a_m < M and a_k < K:
+            a_index = a_start + a_k * a_k_strides
             a_shared[tx, ty] = a_storage[a_index]
 
-        if b_i < K and b_j < N:
-            b_index = batch * b_batch_stride + b_i * b_k_strides + b_j * b_n_strides
+        if b_k < K and b_n < N:
+            b_index = b_start + b_k * b_k_strides
+            # trick: to improve reading cache hit later
             b_shared[ty, tx] = b_storage[b_index]
 
+        # sync threads to make sure all data are loaded
         cuda.syncthreads()
 
         # multiplication for the current tile
@@ -518,10 +528,12 @@ def _tensor_matrix_multiply(
             if (t * BLOCK_DIM + k) < K:
                 result += a_shared[tx, k] * b_shared[ty, k]
 
-        a_j += BLOCK_DIM
-        b_i += BLOCK_DIM
+        # we add block_dim to move to the next tile
+        a_k += BLOCK_DIM
+        b_k += BLOCK_DIM
 
     if i < M and j < N:
+        # finally we write the result to the output
         out_index = batch * out_strides[0] + i * out_strides[1] + j * out_strides[2]
         out[out_index] = result
 
