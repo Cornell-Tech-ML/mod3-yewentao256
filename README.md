@@ -39,8 +39,9 @@ The files that will be synced are:
 - [MiniTorch Module 3](#minitorch-module-3)
   - [Task 3.1 \& 3.2](#task-31--32)
   - [Task 3.3](#task-33)
+      - [Unit test result](#unit-test-result)
   - [Task 3.4](#task-34)
-    - [Unit Test Result](#unit-test-result)
+    - [Unit Test Result](#unit-test-result-1)
     - [Document of MM](#document-of-mm)
       - [MM\_practice](#mm_practice)
       - [tensor\_matrix\_multiply](#tensor_matrix_multiply)
@@ -337,7 +338,7 @@ None
 
 ## Task 3.3
 
-Unit test result
+#### Unit test result
 
 ```bash
 ======================================= test session starts ========================================
@@ -556,7 +557,7 @@ def _tensor_matrix_multiply(
     b_shape: Shape,
     b_strides: Strides,
 ) -> None:
-        # a_shape = (B, M, K), b_shape = (B, K, N), out_shape = (B, M, N)
+    # a_shape = (B, M, K), b_shape = (B, K, N), out_shape = (B, M, N)
     # declare the variables to reduce index operations
     a_batch_stride = a_strides[0] if a_shape[0] > 1 else 0
     b_batch_stride = b_strides[0] if b_shape[0] > 1 else 0
@@ -632,18 +633,57 @@ Understanding of each line could be seen in the code comments.
 
 **Example**:
 
-* `a_shape = (2, 4, 4)`
-* `b_shape = (2, 4, 4)`
-* `out_shape = (2, 4, 4)`
+**`a_shape = (16, 1024, 512)`**, **`b_shape = (16, 512, 2048)`**, **`out_shape = (16, 1024, 2048)`**  
 
-**Execution:**
+Compute the element `(i=100, j=1500)` in `out[5][100][1500]` for batch `5`:
 
-* **Thread `(i=1, j=2)` in Batch `0`:**
-  * Computes the element at row `1`, column `2` of the first output matrix.
-  * Iterates over the `K` dimension in tiles:
-    * Loads relevant tiles from `a` and `b` into `a_shared` and `b_shared`.
-    * Accumulates the product `a_shared[1, k] * b_shared[2, k]` for `k` in the tile.
-  * Stores the computed sum in `out[0][1][2]`.
+1. **Initialize Variables:**
+   * `batch = 5`, `i = 100`, `j = 1500`
+   * `BLOCK_DIM = 32`
+   * `tiles = 16` (since `(512 + 32 - 1) // 32 = 16`)
+
+2. **Precompute Start Positions:**
+   * `a_start = 5 * a_batch_stride + 100 * a_m_strides`
+   * `b_start = 5 * b_batch_stride + 1500 * b_n_strides`
+
+3. **Iterate Over Each Tile (`t` from `0` to `15`):**
+   * **Load Tiles into Shared Memory:**
+
+     ```python
+     if a_m < 1024 and a_k < 512:
+         a_shared[tx, ty] = a_storage[a_start + a_k * a_k_strides]
+     
+     if b_k < 512 and b_n < 2048:
+         b_shared[ty, tx] = b_storage[b_start + b_k * b_k_strides]
+     ```
+
+   * **Synchronize Threads:**
+
+     ```python
+     cuda.syncthreads()
+     ```
+
+   * **Compute Partial Results:**
+
+     ```python
+     for k in range(32):
+         if (t * 32 + k) < 512:
+             result += a_shared[tx, k] * b_shared[ty, k]
+     ```
+
+   * **Move to Next Tile:**
+
+     ```python
+     a_k += 32
+     b_k += 32
+     ```
+
+4. **Write the Result:**
+
+   ```python
+   if 100 < 1024 and 1500 < 2048:
+       out[out_index] = result
+   ```
 
 ---
 
