@@ -509,12 +509,15 @@ def _tensor_matrix_multiply(
     # here we precompute the start to reduce the number of operations
     a_start = batch * a_batch_stride + a_m * a_m_strides
     b_start = batch * b_batch_stride + b_n * b_n_strides
+    
+    # iterate over all tiles
     for t in range(tiles):
         # guard: check if the current tile is within the bounds of the matrix
         if a_m < M and a_k < K:
             a_index = a_start + a_k * a_k_strides
             a_shared[tx, ty] = a_storage[a_index]
 
+        # guard: check if the current tile is within the bounds of the matrix
         if b_k < K and b_n < N:
             b_index = b_start + b_k * b_k_strides
             # trick: to improve reading cache hit later
@@ -532,6 +535,7 @@ def _tensor_matrix_multiply(
         a_k += BLOCK_DIM
         b_k += BLOCK_DIM
 
+    # guard: check if the current thread is within the bounds of the matrix
     if i < M and j < N:
         # finally we write the result to the output
         out_index = batch * out_strides[0] + i * out_strides[1] + j * out_strides[2]
