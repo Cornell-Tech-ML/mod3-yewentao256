@@ -590,7 +590,7 @@ def _tensor_matrix_multiply(
     # here we precompute the start to reduce the number of operations
     a_start = batch * a_batch_stride + a_m * a_m_strides
     b_start = batch * b_batch_stride + b_n * b_n_strides
-    
+
     # iterate over all tiles
     for t in range(tiles):
         # guard: check if the current tile is within the bounds of the matrix
