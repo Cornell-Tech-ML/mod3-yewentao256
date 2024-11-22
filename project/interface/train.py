@@ -87,7 +87,7 @@ def render_train_interface(
         st.markdown("### Hyperparameters")
         col1, col2 = st.columns(2)
         learning_rate = col1.selectbox(
-            "Learning rate", [0.001, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0], index=2
+            "Learning rate", [0.001, 0.01, 0.05, 0.1, 0.3, 0.5, 1.0, 5.0], index=2
         )
 
         max_epochs = col2.number_input(
@@ -136,7 +136,7 @@ def render_train_interface(
             st_epoch_plot.plotly_chart(fig)
 
             print(
-                f"Epoch: {epoch}/{max_epochs}, loss: {total_loss}, correct: {correct}"
+                f"Epoch: {epoch}/{max_epochs}, loss: {total_loss}, correct: {correct}, Time per epoch: {time_per_epoch:.3f}s"
             )
 
     if hasattr(train, "train") and st_train_button.button("Train Model"):

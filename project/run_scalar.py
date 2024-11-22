@@ -10,8 +10,19 @@ import minitorch
 
 class Network(minitorch.Module):
     def __init__(self, hidden_layers):
+        """
+        Initialize the neural network with two hidden layers and one output layer.
+
+        Args:
+            hidden_layers (int): Number of neurons in each hidden layer.
+        """
         super().__init__()
-        raise NotImplementedError("Need to include this file from past assignment.")
+        # Input layer (2 inputs) to first hidden layer
+        self.layer1 = Linear(2, hidden_layers)
+        # First hidden layer to second hidden layer
+        self.layer2 = Linear(hidden_layers, hidden_layers)
+        # Second hidden layer to output layer
+        self.layer3 = Linear(hidden_layers, 1)
 
     def forward(self, x):
         middle = [h.relu() for h in self.layer1.forward(x)]
@@ -40,7 +51,22 @@ class Linear(minitorch.Module):
             )
 
     def forward(self, inputs):
-        raise NotImplementedError("Need to include this file from past assignment.")
+        """
+        Forward pass for the Linear layer.
+
+        Args:
+            inputs (list or tuple of minitorch.Scalar): Input scalars.
+
+        Returns:
+            list of minitorch.Scalar: Output scalars after linear transformation.
+        """
+        outputs = []
+        for j in range(len(self.bias)):
+            weighted_sum = self.bias[j].value
+            for i in range(len(inputs)):
+                weighted_sum += self.weights[i][j].value * inputs[i]
+            outputs.append(weighted_sum)
+        return outputs
 
 
 def default_log_fn(epoch, total_loss, correct, losses):
