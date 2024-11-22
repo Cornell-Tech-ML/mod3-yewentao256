@@ -346,7 +346,7 @@ platform linux -- Python 3.10.12, pytest-8.3.3, pluggy-1.5.0
 rootdir: /content/drive/MyDrive/mod3-yewentao256
 configfile: pyproject.toml
 plugins: hypothesis-6.119.3, typeguard-4.4.1, anyio-3.7.1
-collected 117 items / 60 deselected / 57 selected                                                  
+collected 117 items / 60 deselected / 57 selected
 
 tests/test_tensor_general.py .........................................................       [100%]
 
@@ -416,7 +416,7 @@ platform linux -- Python 3.10.12, pytest-8.3.3, pluggy-1.5.0
 rootdir: /content/drive/MyDrive/mod3-yewentao256
 configfile: pyproject.toml
 plugins: hypothesis-6.119.3, typeguard-4.4.1, anyio-3.7.1
-collected 117 items / 110 deselected / 7 selected                                                  
+collected 117 items / 110 deselected / 7 selected
 
 tests/test_tensor_general.py .......                                                         [100%]
 
@@ -571,7 +571,7 @@ def _tensor_matrix_multiply(
     b_n_strides = b_strides[2]
     batch = cuda.blockIdx.z
     BLOCK_DIM = 32
-    
+
     a_shared = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float32)
     b_shared = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float32)
 
@@ -633,7 +633,7 @@ Understanding of each line could be seen in the code comments.
 
 **Example**:
 
-**`a_shape = (16, 1024, 512)`**, **`b_shape = (16, 512, 2048)`**, **`out_shape = (16, 1024, 2048)`**  
+**`a_shape = (16, 1024, 512)`**, **`b_shape = (16, 512, 2048)`**, **`out_shape = (16, 1024, 2048)`**
 
 Compute the element `(i=100, j=1500)` in `out[5][100][1500]` for batch `5`:
 
@@ -652,7 +652,7 @@ Compute the element `(i=100, j=1500)` in `out[5][100][1500]` for batch `5`:
      ```python
      if a_m < 1024 and a_k < 512:
          a_shared[tx, ty] = a_storage[a_start + a_k * a_k_strides]
-     
+
      if b_k < 512 and b_n < 2048:
          b_shared[ty, tx] = b_storage[b_start + b_k * b_k_strides]
      ```

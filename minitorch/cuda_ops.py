@@ -97,7 +97,7 @@ class CudaOps(TensorOps):
             out_shape[dim] = (a.shape[dim] - 1) // 1024 + 1
             out_a = a.zeros(tuple(out_shape))
 
-            threadsperblock = 1024    # T4
+            threadsperblock = 1024  # T4
             # threadsperblock = 512  # RTX 2070
             blockspergrid = out_a.size
             f[blockspergrid, threadsperblock](  # type: ignore
@@ -129,7 +129,7 @@ class CudaOps(TensorOps):
 
         # One block per batch, extra rows, extra col
         blockspergrid = (
-            # (a + (y-1) // y) -> Round up 
+            # (a + (y-1) // y) -> Round up
             (out.shape[1] + (THREADS_PER_BLOCK - 1)) // THREADS_PER_BLOCK,
             (out.shape[2] + (THREADS_PER_BLOCK - 1)) // THREADS_PER_BLOCK,
             out.shape[0],
@@ -331,7 +331,7 @@ def tensor_reduce(
         reduce_dim: int,
         reduce_value: float,
     ) -> None:
-        BLOCK_DIM = 1024 # T4
+        BLOCK_DIM = 1024  # T4
         # BLOCK_DIM = 512  # My RTX 2070
         cache = cuda.shared.array(BLOCK_DIM, numba.float64)
         out_index = cuda.local.array(MAX_DIMS, numba.int32)
@@ -490,7 +490,7 @@ def _tensor_matrix_multiply(
     b_n_strides = b_strides[2]
     batch = cuda.blockIdx.z
     BLOCK_DIM = 32
-    
+
     a_shared = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float32)
     b_shared = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float32)
 
